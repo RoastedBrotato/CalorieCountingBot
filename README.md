@@ -73,7 +73,10 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 - `!ping` - Check if bot is responsive
 - `!info` - Display bot information
 - `!addcalories <calories> [food_name]` - Add calories for a food item
-- `!today` - View your calories for today
+- `!today` - View your calories for today with numbered entries
+- `!history` - View all your calorie entries for today
+- `!remove <#>` - Remove a specific calorie entry by number
+- `!edit <#> <calories> [new_name]` - Edit a calorie entry
 - `!reset` - Reset your calories for today (with confirmation)
 - `!calorie-help` - Show all calorie tracking commands
 - `!help` - Show all available commands
@@ -133,7 +136,36 @@ Get calorie estimates without images:
 ```
 !today
 ```
-**Result**: Shows your total calories for today plus recent foods logged
+**Result**: Shows your total calories with numbered entries for easy reference
+**Example Output**:
+```
+📊 John's Calories Today
+Total: 1,247 kcal
+
+🍽️ Recent Foods
+1. 09:00 Oatmeal with berries - 180 kcal
+2. 12:15 Caesar salad - 250 kcal
+3. 14:30 Grilled chicken - 300 kcal
+```
+
+#### View Full History
+```
+!history
+```
+**Result**: Shows ALL your calorie entries for today (not limited to 10)
+
+#### Remove Specific Entry
+```
+!remove 2
+```
+**Result**: Removes entry #2 (Caesar salad) and updates your daily total
+
+#### Edit Specific Entry
+```
+!edit 3 350 Grilled chicken breast
+!edit 1 200
+```
+**Result**: Updates entry #3 to 350 calories and changes name, or just updates calories
 
 #### Add Calories Manually  
 ```

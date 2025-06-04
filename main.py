@@ -255,9 +255,13 @@ async def view_today_calories(ctx):
     
     if foods:
         food_list = []
-        for food in foods[-10:]:  # Show last 10 entries
+        # Show last 10 entries with numbers for easy reference
+        display_foods = foods[-10:]
+        start_index = max(0, len(foods) - 10)
+        
+        for i, food in enumerate(display_foods, start=start_index + 1):
             time_str = datetime.fromisoformat(food["timestamp"]).strftime("%H:%M")
-            food_list.append(f"`{time_str}` **{food['name']}** - {food['calories']} kcal")
+            food_list.append(f"`{i}.` `{time_str}` **{food['name']}** - {food['calories']} kcal")
         
         embed.add_field(
             name="🍽️ Recent Foods",
@@ -266,7 +270,9 @@ async def view_today_calories(ctx):
         )
         
         if len(foods) > 10:
-            embed.set_footer(text=f"Showing last 10 of {len(foods)} entries")
+            embed.set_footer(text=f"Showing last 10 of {len(foods)} entries • Use !history for all entries • Use !remove <#> to delete entries")
+        else:
+            embed.set_footer(text="Use !remove <#> to delete entries • Use !history for detailed view")
     else:
         embed.add_field(
             name="🍽️ No foods logged today",
@@ -352,6 +358,9 @@ async def calorie_help(ctx):
     commands_list = [
         (f"{COMMAND_PREFIX}addcalories <calories> [food_name]", "Add calories for a food item"),
         (f"{COMMAND_PREFIX}today", "View your calories for today"),
+        (f"{COMMAND_PREFIX}history", "View all your calorie entries for today"),
+        (f"{COMMAND_PREFIX}remove <#>", "Remove a specific calorie entry by number"),
+        (f"{COMMAND_PREFIX}edit <#> <calories> [new_name]", "Edit a calorie entry"),
         (f"{COMMAND_PREFIX}reset", "Reset your calories for today (with confirmation)"),
         (f"{COMMAND_PREFIX}analyzeimage", "Analyze food image for calories (attach image)"),
         (f"{COMMAND_PREFIX}analyzefood [description]", "Enhanced analysis with measurements (e.g., '350g chicken')"),
@@ -998,6 +1007,185 @@ async def estimate_calories(ctx, *, description: str):
             color=0xff0000
         )
         await ctx.send(embed=embed)
+
+@bot.command(name='remove', aliases=['delete', 'del'])
+async def remove_calorie_entry(ctx, entry_number: int):
+    """Remove a specific calorie entry by number (use !today to see numbers)"""
+    user_id_str = str(ctx.author.id)
+    today = str(date.today())
+    
+    # Check if user has any entries today
+    if user_id_str not in user_calories or today not in user_calories[user_id_str]:
+        await ctx.send("❌ You have no calorie entries for today!")
+        return
+    
+    foods = user_calories[user_id_str][today]["foods"]
+    
+    # Check if entry number is valid
+    if entry_number < 1 or entry_number > len(foods):
+        await ctx.send(f"❌ Invalid entry number! You have {len(foods)} entries. Use `!today` to see them.")
+        return
+    
+    # Get the entry to remove (convert to 0-based index)
+    entry_to_remove = foods[entry_number - 1]
+    removed_calories = entry_to_remove["calories"]
+    removed_food = entry_to_remove["name"]
+    
+    # Remove the entry
+    foods.pop(entry_number - 1)
+    
+    # Update total calories
+    user_calories[user_id_str][today]["total_calories"] -= removed_calories
+    
+    # Save changes
+    save_calories_data()
+    
+    # Send confirmation
+    new_total = user_calories[user_id_str][today]["total_calories"]
+    embed = discord.Embed(
+        title="🗑️ Entry Removed",
+        description=f"Removed **{removed_food}** ({removed_calories} kcal)",
+        color=0xff6b6b
+    )
+    embed.add_field(
+        name="📊 Updated Total",
+        value=f"**{new_total} kcal**",
+        inline=True
+    )
+    embed.set_footer(text=f"Removed by {ctx.author.display_name}")
+    
+    await ctx.send(embed=embed)
+
+@bot.command(name='history', aliases=['all', 'full'])
+async def view_full_history(ctx):
+    """View all your calorie entries for today"""
+    daily_data = get_user_daily_calories(ctx.author.id)
+    total_calories = daily_data["total_calories"]
+    foods = daily_data["foods"]
+    
+    embed = discord.Embed(
+        title=f"📈 {ctx.author.display_name}'s Full History Today",
+        description=f"**Total: {total_calories} kcal**",
+        color=0x9932cc
+    )
+    
+    if foods:
+        # Group foods into chunks to avoid Discord message limits
+        food_chunks = []
+        current_chunk = []
+        
+        for i, food in enumerate(foods, 1):
+            time_str = datetime.fromisoformat(food["timestamp"]).strftime("%H:%M")
+            entry = f"`{i}.` `{time_str}` **{food['name']}** - {food['calories']} kcal"
+            
+            # Check if adding this entry would exceed Discord's field limit
+            if len('\n'.join(current_chunk + [entry])) > 1000:
+                food_chunks.append(current_chunk)
+                current_chunk = [entry]
+            else:
+                current_chunk.append(entry)
+        
+        if current_chunk:
+            food_chunks.append(current_chunk)
+        
+        # Add fields for each chunk
+        for i, chunk in enumerate(food_chunks):
+            field_name = f"🍽️ Foods" if i == 0 else f"🍽️ Foods (continued {i+1})"
+            embed.add_field(
+                name=field_name,
+                value="\n".join(chunk),
+                inline=False
+            )
+        
+        embed.set_footer(text=f"Total: {len(foods)} entries • Use !remove <#> to delete entries")
+    else:
+        embed.add_field(
+            name="🍽️ No foods logged today",
+            value="Use `!addcalories` or analyze food images to start tracking!",
+            inline=False
+        )
+    
+    await ctx.send(embed=embed)
+
+@bot.command(name='edit', aliases=['modify'])
+async def edit_calorie_entry(ctx, entry_number: int, new_calories: int, *, new_food_name: str = None):
+    """Edit a calorie entry (use !today to see numbers)"""
+    user_id_str = str(ctx.author.id)
+    today = str(date.today())
+    
+    # Validate new calories
+    if new_calories <= 0:
+        await ctx.send("❌ Calories must be a positive number!")
+        return
+    
+    # Check if user has any entries today
+    if user_id_str not in user_calories or today not in user_calories[user_id_str]:
+        await ctx.send("❌ You have no calorie entries for today!")
+        return
+    
+    foods = user_calories[user_id_str][today]["foods"]
+    
+    # Check if entry number is valid
+    if entry_number < 1 or entry_number > len(foods):
+        await ctx.send(f"❌ Invalid entry number! You have {len(foods)} entries. Use `!today` to see them.")
+        return
+    
+    # Get the entry to edit (convert to 0-based index)
+    entry_to_edit = foods[entry_number - 1]
+    old_calories = entry_to_edit["calories"]
+    old_food_name = entry_to_edit["name"]
+    
+    # Update the entry
+    entry_to_edit["calories"] = new_calories
+    if new_food_name:
+        entry_to_edit["name"] = new_food_name
+    entry_to_edit["timestamp"] = datetime.now().isoformat()  # Update timestamp
+    
+    # Update total calories
+    calorie_difference = new_calories - old_calories
+    user_calories[user_id_str][today]["total_calories"] += calorie_difference
+    
+    # Save changes
+    save_calories_data()
+    
+    # Send confirmation
+    new_total = user_calories[user_id_str][today]["total_calories"]
+    embed = discord.Embed(
+        title="✏️ Entry Updated",
+        description=f"**Entry #{entry_number}** has been updated",
+        color=0x00ff00
+    )
+    
+    changes = []
+    if new_food_name and new_food_name != old_food_name:
+        changes.append(f"**Food:** {old_food_name} → {new_food_name}")
+    if new_calories != old_calories:
+        changes.append(f"**Calories:** {old_calories} → {new_calories} kcal")
+    
+    if changes:
+        embed.add_field(
+            name="📝 Changes Made",
+            value="\n".join(changes),
+            inline=False
+        )
+    
+    embed.add_field(
+        name="📊 Updated Total",
+        value=f"**{new_total} kcal**",
+        inline=True
+    )
+    
+    if calorie_difference != 0:
+        difference_text = f"+{calorie_difference}" if calorie_difference > 0 else str(calorie_difference)
+        embed.add_field(
+            name="📈 Change",
+            value=f"**{difference_text} kcal**",
+            inline=True
+        )
+    
+    embed.set_footer(text=f"Edited by {ctx.author.display_name}")
+    
+    await ctx.send(embed=embed)
 
 async def main():
     """Main function to run the bot"""
