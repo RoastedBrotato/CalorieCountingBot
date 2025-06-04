@@ -2,6 +2,9 @@ import discord
 from discord.ext import commands
 import asyncio
 import logging
+import json
+import os
+from datetime import datetime, date
 from config import DISCORD_TOKEN, COMMAND_PREFIX, BOT_NAME, BOT_DESCRIPTION
 from image_analysis import analyze_food_image, analyze_food_with_description, is_image_analysis_available, test_gemini_api
 
@@ -9,10 +12,67 @@ from image_analysis import analyze_food_image, analyze_food_with_description, is
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Simple in-memory calorie tracking (you could enhance this with a database)
+user_calories = {}
+CALORIES_FILE = "user_calories.json"
+
+def load_calories_data():
+    """Load calorie data from file"""
+    global user_calories
+    try:
+        if os.path.exists(CALORIES_FILE):
+            with open(CALORIES_FILE, 'r') as f:
+                user_calories = json.load(f)
+    except Exception as e:
+        logger.error(f"Error loading calories data: {e}")
+        user_calories = {}
+
+def save_calories_data():
+    """Save calorie data to file"""
+    try:
+        with open(CALORIES_FILE, 'w') as f:
+            json.dump(user_calories, f, indent=2)
+    except Exception as e:
+        logger.error(f"Error saving calories data: {e}")
+
+def add_user_calories(user_id: int, calories: int, food_name: str):
+    """Add calories for a user"""
+    user_id_str = str(user_id)
+    today = str(date.today())
+    
+    if user_id_str not in user_calories:
+        user_calories[user_id_str] = {}
+    
+    if today not in user_calories[user_id_str]:
+        user_calories[user_id_str][today] = {
+            "total_calories": 0,  
+            "foods": []
+        }
+    
+    user_calories[user_id_str][today]["total_calories"] += calories
+    user_calories[user_id_str][today]["foods"].append({
+        "name": food_name,
+        "calories": calories,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    save_calories_data()
+    return user_calories[user_id_str][today]["total_calories"]
+
+def get_user_daily_calories(user_id: int):
+    """Get user's calories for today"""
+    user_id_str = str(user_id)
+    today = str(date.today())
+    
+    if user_id_str in user_calories and today in user_calories[user_id_str]:
+        return user_calories[user_id_str][today]
+    return {"total_calories": 0, "foods": []}
+
 # Bot setup with intents
 intents = discord.Intents.default()
 intents.message_content = True  # Required for reading message content
 intents.guilds = True
+intents.reactions = True  # Required for reaction events
 
 # Create bot instance
 bot = commands.Bot(
@@ -29,6 +89,9 @@ async def on_ready():
     logger.info(f'Bot ID: {bot.user.id}')
     logger.info(f'Connected to {len(bot.guilds)} guilds')
     
+    # Load calorie data
+    load_calories_data()
+    
     # Set bot status
     await bot.change_presence(
         activity=discord.Activity(
@@ -38,18 +101,97 @@ async def on_ready():
     )
 
 @bot.event
-async def on_command_error(ctx, error):
-    """Global error handler for commands"""
-    if isinstance(error, commands.CommandNotFound):
-        logger.warning(f"Command not found: '{ctx.message.content}' by {ctx.author}")
-        await ctx.send("❌ Command not found! Use `!help` to see available commands.")
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing required argument: {error.param}")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send("❌ Invalid argument provided!")
-    else:
-        logger.error(f"Unexpected error in command '{ctx.command}': {error}")
-        await ctx.send("❌ An unexpected error occurred!")
+async def on_reaction_add(ctx, user):
+    """Handle when users react to messages"""
+    # Ignore reactions from the bot itself
+    if user == bot.user:
+        return
+    
+    # Check if the reaction is on a message from the bot
+    if ctx.message.author != bot.user:
+        return
+    
+    # Check if it's a calorie analysis message (has an embed with "Food Analysis Results" in title)
+    if not ctx.message.embeds:
+        return
+    
+    embed = ctx.message.embeds[0]
+    if "Food Analysis Results" not in embed.title:
+        return
+    
+    # Handle the reaction
+    if str(ctx.emoji) == "✅":
+        await handle_add_calories_reaction(ctx, user, embed)
+    elif str(ctx.emoji) == "❌":
+        await handle_decline_calories_reaction(ctx, user)
+
+async def handle_add_calories_reaction(ctx, user, embed):
+    """Handle when user clicks ✅ to add calories"""
+    try:
+        # Extract calories from the embed
+        calories_field = None
+        for field in embed.fields:
+            if "Estimated Calories" in field.name:
+                calories_field = field.value
+                break
+        
+        if not calories_field:
+            return
+        
+        # Extract the numeric value (e.g., "**450 kcal**" -> 450)
+        import re
+        calories_match = re.search(r'\*\*(\d+)\s*kcal\*\*', calories_field)
+        if not calories_match:
+            return
+        
+        calories = int(calories_match.group(1))
+        
+        # Extract food name from embed title or description
+        food_name = embed.description.strip('**') if embed.description else "Unknown food"
+        
+        # Add calories to user's daily total
+        total_today = add_user_calories(user.id, calories, food_name)
+        
+        # Send confirmation message
+        confirmation_embed = discord.Embed(
+            title="✅ Calories Added!",
+            description=f"Added **{calories} kcal** for **{food_name}**",
+            color=0x00ff00
+        )
+        confirmation_embed.add_field(
+            name="📊 Today's Total",
+            value=f"**{total_today} kcal**",
+            inline=True
+        )
+        confirmation_embed.set_footer(text=f"Logged for {user.display_name}")
+        
+        # Send as a reply to the original message or in the same channel
+        await ctx.message.channel.send(embed=confirmation_embed)
+        
+        logger.info(f"Added {calories} calories for user {user.id} ({user.display_name})")
+        
+    except Exception as e:
+        logger.error(f"Error handling add calories reaction: {e}")
+        await ctx.message.channel.send("❌ Error adding calories. Please try using the `!addcalories` command instead.")
+
+async def handle_decline_calories_reaction(ctx, user):
+    """Handle when user clicks ❌ to decline adding calories"""
+    try:
+        # Send a simple acknowledgment
+        decline_embed = discord.Embed(
+            title="❌ Calories Not Added",
+            description="No worries! The analysis wasn't added to your daily total.",
+            color=0xff6b6b
+        )
+        decline_embed.set_footer(text=f"Declined by {user.display_name}")
+        
+        # Send as a reply to the original message or in the same channel  
+        await ctx.message.channel.send(embed=decline_embed)
+        
+        logger.info(f"User {user.id} ({user.display_name}) declined adding calories")
+        
+    except Exception as e:
+        logger.error(f"Error handling decline calories reaction: {e}")
 
 # Basic Commands
 @bot.command(name='ping')
@@ -73,7 +215,7 @@ async def info(ctx):
     
     await ctx.send(embed=embed)
 
-# Calorie tracking commands (basic examples)
+# Calorie tracking commands
 @bot.command(name='addcalories', aliases=['add'])
 async def add_calories(ctx, calories: int, *, food_name="Unknown food"):
     """Add calories for a food item"""
@@ -81,14 +223,122 @@ async def add_calories(ctx, calories: int, *, food_name="Unknown food"):
         await ctx.send("❌ Calories must be a positive number!")
         return
     
+    # Add to user's daily total
+    total_today = add_user_calories(ctx.author.id, calories, food_name)
+    
     embed = discord.Embed(
         title="✅ Calories Added",
         description=f"Added **{calories}** calories for **{food_name}**",
         color=0x00ff00
     )
+    embed.add_field(
+        name="📊 Today's Total",
+        value=f"**{total_today} kcal**", 
+        inline=True
+    )
     embed.set_footer(text=f"Logged by {ctx.author.display_name}")
     
     await ctx.send(embed=embed)
+
+@bot.command(name='today', aliases=['daily', 'calories'])
+async def view_today_calories(ctx):
+    """View your calories for today"""
+    daily_data = get_user_daily_calories(ctx.author.id)
+    total_calories = daily_data["total_calories"]
+    foods = daily_data["foods"]
+    
+    embed = discord.Embed(
+        title=f"📊 {ctx.author.display_name}'s Calories Today",
+        description=f"**Total: {total_calories} kcal**",
+        color=0x0099ff
+    )
+    
+    if foods:
+        food_list = []
+        for food in foods[-10:]:  # Show last 10 entries
+            time_str = datetime.fromisoformat(food["timestamp"]).strftime("%H:%M")
+            food_list.append(f"`{time_str}` **{food['name']}** - {food['calories']} kcal")
+        
+        embed.add_field(
+            name="🍽️ Recent Foods",
+            value="\n".join(food_list),
+            inline=False
+        )
+        
+        if len(foods) > 10:
+            embed.set_footer(text=f"Showing last 10 of {len(foods)} entries")
+    else:
+        embed.add_field(
+            name="🍽️ No foods logged today",
+            value="Use `!addcalories` or analyze food images to start tracking!",
+            inline=False
+        )
+    
+    await ctx.send(embed=embed)
+
+@bot.command(name='reset', aliases=['clear'])
+async def reset_today_calories(ctx):
+    """Reset your calories for today (with confirmation)"""
+    daily_data = get_user_daily_calories(ctx.author.id)
+    
+    if daily_data["total_calories"] == 0:
+        await ctx.send("❌ You have no calories logged for today!")
+        return
+    
+    embed = discord.Embed(
+        title="⚠️ Reset Today's Calories?",
+        description=f"Are you sure you want to reset your **{daily_data['total_calories']} kcal** for today?",
+        color=0xff9900
+    )
+    embed.add_field(
+        name="⚡ This action cannot be undone",
+        value="React with ✅ to confirm or ❌ to cancel",
+        inline=False
+    )
+    
+    message = await ctx.send(embed=embed)
+    await message.add_reaction("✅")
+    await message.add_reaction("❌")
+    
+    def check(reaction, user):
+        return user == ctx.author and str(reaction.emoji) in ["✅", "❌"] and reaction.message.id == message.id
+    
+    try:
+        reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
+        
+        if str(reaction.emoji) == "✅":
+            # Reset user's data for today
+            user_id_str = str(ctx.author.id)
+            today = str(date.today())
+            
+            if user_id_str in user_calories and today in user_calories[user_id_str]:
+                del user_calories[user_id_str][today]
+                save_calories_data()
+            
+            embed = discord.Embed(
+                title="✅ Calories Reset",
+                description="Your calories for today have been reset to 0.",
+                color=0x00ff00
+            )
+            await message.edit(embed=embed)
+            await message.clear_reactions()
+        else:
+            embed = discord.Embed(
+                title="❌ Reset Cancelled",
+                description="Your calories were not reset.",
+                color=0xff6b6b
+            )
+            await message.edit(embed=embed)
+            await message.clear_reactions()
+            
+    except asyncio.TimeoutError:
+        embed = discord.Embed(
+            title="⏰ Reset Timed Out",
+            description="Reset cancelled due to timeout.",
+            color=0x666666
+        )
+        await message.edit(embed=embed)
+        await message.clear_reactions()
 
 @bot.command(name='calorie-help', aliases=['chelp'])
 async def calorie_help(ctx):
@@ -101,6 +351,8 @@ async def calorie_help(ctx):
     
     commands_list = [
         (f"{COMMAND_PREFIX}addcalories <calories> [food_name]", "Add calories for a food item"),
+        (f"{COMMAND_PREFIX}today", "View your calories for today"),
+        (f"{COMMAND_PREFIX}reset", "Reset your calories for today (with confirmation)"),
         (f"{COMMAND_PREFIX}analyzeimage", "Analyze food image for calories (attach image)"),
         (f"{COMMAND_PREFIX}analyzefood [description]", "Enhanced analysis with measurements (e.g., '350g chicken')"),
         (f"{COMMAND_PREFIX}estimate <description>", "Text-only calorie estimation (no image needed)"),
@@ -111,6 +363,14 @@ async def calorie_help(ctx):
     
     for command, description in commands_list:
         embed.add_field(name=command, value=description, inline=False)
+        
+    # Add reaction instructions
+    embed.add_field(
+        name="🔥 Quick Logging",
+        value="After AI analysis, react with ✅ to add calories or ❌ to decline",
+        inline=False
+    )
+        
       # Add image analysis status
     if is_image_analysis_available():
         embed.add_field(
@@ -191,6 +451,8 @@ async def test_api(ctx):
 async def analyze_image(ctx):
     """Analyze a food image to estimate calories and nutrition"""
     
+    logger.info(f"analyzeimage command called by {ctx.author.display_name} ({ctx.author.id})")
+    
     # Check if image analysis is available
     if not is_image_analysis_available():
         await ctx.send("❌ Image analysis is not available. The bot administrator needs to configure the Gemini API key.")
@@ -229,8 +491,12 @@ async def analyze_image(ctx):
     thinking_msg = await ctx.send("🤔 Analyzing your food image... This may take a few seconds.")
     
     try:
+        logger.info(f"Starting analysis for image: {attachment.filename}")
+        
         # Analyze the image
         result = await analyze_food_image(attachment.url)
+        
+        logger.info(f"Analysis completed, deleting thinking message")
         
         # Delete thinking message
         await thinking_msg.delete()
@@ -243,6 +509,8 @@ async def analyze_image(ctx):
             )
             await ctx.send(embed=embed)
             return
+        
+        logger.info(f"Creating result embed for {result.get('food_name', 'Unknown')} - {result.get('calories', 0)} kcal")
         
         # Create result embed
         confidence = result.get("confidence", 0)
@@ -314,12 +582,18 @@ async def analyze_image(ctx):
         # Add thumbnail with the analyzed image
         embed.set_thumbnail(url=attachment.url)
         
+        logger.info(f"Sending result message...")
+        
         # Send the main result with embedded reactions
         result_message = await ctx.send(embed=embed)
+        
+        logger.info(f"Result message sent, adding reactions...")
         
         # Add reaction buttons to the main message instead of creating a separate one
         await result_message.add_reaction("✅")  # Yes, add calories
         await result_message.add_reaction("❌")  # No, don't add
+        
+        logger.info(f"Reactions added successfully")
         
     except Exception as e:
         # Delete thinking message if it still exists

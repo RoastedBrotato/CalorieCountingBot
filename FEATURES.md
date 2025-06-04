@@ -41,12 +41,83 @@
 - **Description accuracy matching** (good/partial/poor)
 - **Quick add buttons** (✅/❌ reactions)
 - **Comprehensive help system**
+- **Persistent calorie tracking** with daily totals
+- **Automatic logging** via reaction buttons
+
+## New Tracking Features
+
+### 4. `!today` - View Daily Progress
+- **Purpose**: Check your calorie intake for today
+- **Shows**: Total calories, recent foods, timestamps
+- **Example Output**: 
+  ```
+  📊 John's Calories Today
+  Total: 1,247 kcal
+  
+  🍽️ Recent Foods
+  14:30 Grilled chicken - 300 kcal
+  12:15 Caesar salad - 250 kcal
+  09:00 Oatmeal with berries - 180 kcal
+  ```
+
+### 5. `!reset` - Clear Daily Progress
+- **Purpose**: Reset today's calorie count to zero
+- **Safety**: Requires confirmation with ✅/❌ reactions
+- **Use case**: Mistaken entries or starting fresh
+
+### 6. Enhanced `!addcalories` Command
+- **New feature**: Shows updated daily total after adding
+- **Integration**: Works with persistent storage system
+- **Example**: "Added 300 kcal for Chicken • Today's Total: 1,547 kcal"
+
+## Reaction-Based Quick Logging
+
+### How It Works
+1. Use any AI analysis command (`!analyzeimage`, `!analyzefood`, `!estimate`)
+2. Bot provides calorie estimate with ✅ and ❌ reactions
+3. Click ✅ to automatically add calories to your daily total
+4. Click ❌ to decline (analysis is ignored)
+5. Get instant confirmation with updated daily total
+
+### Benefits
+- **No manual typing** - just react to add calories
+- **Prevents duplicate entries** - one reaction = one log entry
+- **Instant feedback** - see your daily total immediately
+- **Error prevention** - confirmation messages prevent mistakes
+
+## Data Persistence
+
+### Storage System
+- **JSON file storage** (`user_calories.json`)
+- **Per-user tracking** - each Discord user has separate data
+- **Daily organization** - calories organized by date
+- **Automatic backup** - data saved after each entry
+
+### Data Structure
+```json
+{
+  "user_id": {
+    "2025-06-04": {
+      "total_calories": 1247,
+      "foods": [
+        {
+          "name": "Grilled chicken",
+          "calories": 300,
+          "timestamp": "2025-06-04T14:30:00"
+        }
+      ]
+    }
+  }
+}
+```
 
 ## Command Hierarchy
 
 1. **Basic**: `!analyzeimage` - Image only
 2. **Enhanced**: `!analyzefood [description]` - Image + text for accuracy
 3. **Text-only**: `!estimate <description>` - No image needed
+4. **Manual**: `!addcalories <amount> [food]` - Direct entry
+5. **Tracking**: `!today` - View progress, `!reset` - Clear day
 
 ## Usage Tips
 

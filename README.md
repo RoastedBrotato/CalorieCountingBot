@@ -73,6 +73,8 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 - `!ping` - Check if bot is responsive
 - `!info` - Display bot information
 - `!addcalories <calories> [food_name]` - Add calories for a food item
+- `!today` - View your calories for today
+- `!reset` - Reset your calories for today (with confirmation)
 - `!calorie-help` - Show all calorie tracking commands
 - `!help` - Show all available commands
 
@@ -81,6 +83,12 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 - `!analyzefood [description]` - **Enhanced analysis** with measurements (e.g., "350g chicken and salad")
 - `!estimate <description>` - **Text-only** calorie estimation (no image needed)
 - `!testapi` - Test if Gemini AI is working properly
+
+### 🔥 Quick Calorie Logging
+After any AI analysis, the bot will add ✅ and ❌ reaction buttons:
+- **React with ✅** to automatically add the estimated calories to your daily total
+- **React with ❌** to decline adding the calories
+- No need to manually type `!addcalories` - just click the reaction!
 
 ### Advanced Food Analysis Features
 
@@ -91,6 +99,7 @@ Upload any food image to get:
 - 🎯 **Confidence score** for the analysis
 - 📏 **Portion size** estimation
 - 💡 **Health notes** and nutritional insights
+- ✅/❌ **Quick add buttons** via reactions
 
 #### 2. **Enhanced Image + Description Analysis** (`!analyzefood`)
 Get **more accurate results** by combining images with descriptions:
@@ -98,6 +107,7 @@ Get **more accurate results** by combining images with descriptions:
 - Example: `!analyzefood 350g grilled chicken breast with 2 cups rice`
 - Higher confidence scores due to specific measurements
 - Better portion size accuracy
+- ✅/❌ **Quick add buttons** via reactions
 
 #### 3. **Text-Only Estimation** (`!estimate`)
 Get calorie estimates without images:
@@ -111,9 +121,31 @@ Get calorie estimates without images:
 ```
 !addcalories 250 Apple
 !addcalories 150 Banana
+!today
+!reset
 !ping
 !info
 ```
+
+### Daily Calorie Tracking Examples
+
+#### View Today's Progress
+```
+!today
+```
+**Result**: Shows your total calories for today plus recent foods logged
+
+#### Add Calories Manually  
+```
+!addcalories 300 Grilled chicken
+```
+**Result**: Adds 300 calories and shows your updated daily total
+
+#### Reset Daily Progress
+```
+!reset
+```
+**Result**: Clears today's calories with confirmation prompt
 
 ### AI Food Analysis Examples
 
@@ -127,6 +159,7 @@ Get calorie estimates without images:
 1. **Upload photo + description** → `!analyzefood 350g salmon with vegetables`
 2. **Get enhanced accuracy** → Higher confidence due to specific measurements
 3. **Better nutritional info** → More precise calculations based on weight
+4. **Quick logging** → React with ✅ to add to daily total
 
 #### Text-Only Analysis
 1. **Describe your food** → `!estimate 2 slices whole wheat toast with peanut butter`
