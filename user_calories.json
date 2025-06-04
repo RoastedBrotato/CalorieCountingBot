@@ -1,12 +1,17 @@
 {
   "646374805041577988": {
     "2025-06-04": {
-      "total_calories": 650,
+      "total_calories": 1000,
       "foods": [
         {
           "name": "Fried Chicken with Pea Pulao",
           "calories": 650,
           "timestamp": "2025-06-04T17:59:06.620509"
+        },
+        {
+          "name": "Toast, Boiled Eggs, and Coffee",
+          "calories": 350,
+          "timestamp": "2025-06-04T18:30:23.782655"
         }
       ]
     }

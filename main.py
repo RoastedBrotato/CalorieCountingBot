@@ -106,18 +106,24 @@ async def on_reaction_add(ctx, user):
     # Ignore reactions from the bot itself
     if user == bot.user:
         return
-    
-    # Check if the reaction is on a message from the bot
+      # Check if the reaction is on a message from the bot
     if ctx.message.author != bot.user:
         return
     
-    # Check if it's a calorie analysis message (has an embed with "Food Analysis Results" in title)
+    # Check if it's a calorie analysis message (has an embed with analysis results in title)
     if not ctx.message.embeds:
         return
     
     embed = ctx.message.embeds[0]
-    if "Food Analysis Results" not in embed.title:
+    logger.info(f"Reaction {ctx.emoji} from {user.display_name} on embed with title: '{embed.title}'")
+    
+    # Check for any type of food analysis result
+    analysis_keywords = ["Food Analysis Results", "Text-based Calorie Estimation"]
+    if not any(keyword in embed.title for keyword in analysis_keywords):
+        logger.info(f"Embed title '{embed.title}' does not contain analysis keywords, ignoring reaction")
         return
+    
+    logger.info(f"Processing {ctx.emoji} reaction on analysis message")
     
     # Handle the reaction
     if str(ctx.emoji) == "✅":
@@ -128,29 +134,38 @@ async def on_reaction_add(ctx, user):
 async def handle_add_calories_reaction(ctx, user, embed):
     """Handle when user clicks ✅ to add calories"""
     try:
+        logger.info(f"Processing ✅ reaction from {user.display_name} for embed title: '{embed.title}'")
+        
         # Extract calories from the embed
         calories_field = None
         for field in embed.fields:
+            logger.info(f"Checking field: '{field.name}' = '{field.value}'")
             if "Estimated Calories" in field.name:
                 calories_field = field.value
+                logger.info(f"Found calories field: '{calories_field}'")
                 break
         
         if not calories_field:
+            logger.warning("No calories field found in embed")
             return
         
         # Extract the numeric value (e.g., "**450 kcal**" -> 450)
         import re
         calories_match = re.search(r'\*\*(\d+)\s*kcal\*\*', calories_field)
         if not calories_match:
+            logger.warning(f"Could not extract calories from: '{calories_field}'")
             return
         
         calories = int(calories_match.group(1))
+        logger.info(f"Extracted calories: {calories}")
         
         # Extract food name from embed title or description
         food_name = embed.description.strip('**') if embed.description else "Unknown food"
+        logger.info(f"Extracted food name: '{food_name}'")
         
         # Add calories to user's daily total
         total_today = add_user_calories(user.id, calories, food_name)
+        logger.info(f"Added {calories} calories for user {user.id}, new total: {total_today}")
         
         # Send confirmation message
         confirmation_embed = discord.Embed(
