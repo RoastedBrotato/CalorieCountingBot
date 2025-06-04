@@ -6,6 +6,8 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 
 - 🍎 Track calories for different food items
 - 📊 View nutritional information
+- 📸 **AI-powered image recognition** for food calorie estimation
+- 🤖 **Google Gemini Vision** integration for accurate food analysis
 - 💬 Interactive Discord commands
 - 🎯 Easy-to-use command system
 
@@ -16,6 +18,7 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 - Python 3.8 or higher
 - Discord account
 - Discord server where you have permission to add bots
+- **Google AI Studio account** (for image recognition features)
 
 ### Installation
 
@@ -43,9 +46,12 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 5. **Configure environment variables**
    - Edit the `.env` file
    - Replace `your_bot_token_here` with your actual bot token
+   - Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Replace `your_gemini_api_key_here` with your actual Gemini API key
    ```
    DISCORD_TOKEN=your_actual_bot_token_here
    COMMAND_PREFIX=!
+   GEMINI_API_KEY=your_actual_gemini_api_key_here
    ```
 
 6. **Invite bot to your server**
@@ -64,17 +70,35 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 - `!ping` - Check if bot is responsive
 - `!info` - Display bot information
 - `!addcalories <calories> [food_name]` - Add calories for a food item
+- `!analyzeimage` - **NEW!** Analyze food image for calorie estimation (attach image)
 - `!calorie-help` - Show all calorie tracking commands
 - `!help` - Show all available commands
+
+### Image Analysis Feature
+
+Upload any food image and use `!analyzeimage` to get:
+- 🔥 **Calorie estimation** based on visible portion
+- 📊 **Nutritional breakdown** (protein, carbs, fat, etc.)
+- 🎯 **Confidence score** for the analysis
+- 📏 **Portion size** estimation
+- 💡 **Health notes** and nutritional insights
 
 ## Example Usage
 
 ```
 !addcalories 250 Apple
 !addcalories 150 Banana
+!analyzeimage [upload food image]
 !ping
 !info
 ```
+
+### Image Analysis Examples
+
+1. **Upload a photo of your meal** → `!analyzeimage`
+2. **Get instant calorie estimate** → "Grilled chicken breast: ~300 calories"
+3. **View nutritional breakdown** → Protein: 45g, Carbs: 0g, Fat: 8g
+4. **Add to your log** → React with ✅ to add calories automatically
 
 ## Project Structure
 
