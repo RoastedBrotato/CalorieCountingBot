@@ -7,6 +7,8 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 - 🍎 Track calories for different food items
 - 📊 View nutritional information
 - 📸 **AI-powered image recognition** for food calorie estimation
+- 🔍 **Enhanced analysis** with text descriptions for better accuracy
+- 📝 **Text-only estimation** for foods without images
 - 🤖 **Google Gemini Vision** integration for accurate food analysis
 - 💬 Interactive Discord commands
 - 🎯 Easy-to-use command system
@@ -67,38 +69,69 @@ A Discord bot designed to help users track their daily calorie intake and nutrit
 
 ## Available Commands
 
+### Basic Commands
 - `!ping` - Check if bot is responsive
 - `!info` - Display bot information
 - `!addcalories <calories> [food_name]` - Add calories for a food item
-- `!analyzeimage` - **NEW!** Analyze food image for calorie estimation (attach image)
 - `!calorie-help` - Show all calorie tracking commands
 - `!help` - Show all available commands
 
-### Image Analysis Feature
+### AI-Powered Food Analysis
+- `!analyzeimage` - Analyze food image for calorie estimation (attach image)
+- `!analyzefood [description]` - **Enhanced analysis** with measurements (e.g., "350g chicken and salad")
+- `!estimate <description>` - **Text-only** calorie estimation (no image needed)
+- `!testapi` - Test if Gemini AI is working properly
 
-Upload any food image and use `!analyzeimage` to get:
+### Advanced Food Analysis Features
+
+#### 1. **Image-Only Analysis** (`!analyzeimage`)
+Upload any food image to get:
 - 🔥 **Calorie estimation** based on visible portion
 - 📊 **Nutritional breakdown** (protein, carbs, fat, etc.)
 - 🎯 **Confidence score** for the analysis
 - 📏 **Portion size** estimation
 - 💡 **Health notes** and nutritional insights
 
+#### 2. **Enhanced Image + Description Analysis** (`!analyzefood`)
+Get **more accurate results** by combining images with descriptions:
+- Upload an image **and** provide measurements
+- Example: `!analyzefood 350g grilled chicken breast with 2 cups rice`
+- Higher confidence scores due to specific measurements
+- Better portion size accuracy
+
+#### 3. **Text-Only Estimation** (`!estimate`)
+Get calorie estimates without images:
+- Perfect for homemade meals or when you can't take photos
+- Example: `!estimate 1 cup oatmeal with banana and honey`
+- Includes nutritional breakdown and health insights
+
 ## Example Usage
 
+### Basic Calorie Tracking
 ```
 !addcalories 250 Apple
 !addcalories 150 Banana
-!analyzeimage [upload food image]
 !ping
 !info
 ```
 
-### Image Analysis Examples
+### AI Food Analysis Examples
 
+#### Image Analysis
 1. **Upload a photo of your meal** → `!analyzeimage`
 2. **Get instant calorie estimate** → "Grilled chicken breast: ~300 calories"
 3. **View nutritional breakdown** → Protein: 45g, Carbs: 0g, Fat: 8g
 4. **Add to your log** → React with ✅ to add calories automatically
+
+#### Enhanced Analysis (Image + Description)
+1. **Upload photo + description** → `!analyzefood 350g salmon with vegetables`
+2. **Get enhanced accuracy** → Higher confidence due to specific measurements
+3. **Better nutritional info** → More precise calculations based on weight
+
+#### Text-Only Analysis
+1. **Describe your food** → `!estimate 2 slices whole wheat toast with peanut butter`
+2. **Get instant estimate** → "Whole wheat toast with peanut butter: ~320 calories"
+3. **No image needed** → Perfect for quick logging
 
 ## Project Structure
 
