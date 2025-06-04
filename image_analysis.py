@@ -67,12 +67,49 @@ async def analyze_food_image(image_url: str) -> dict:
         - If unclear, indicate lower confidence score
         - Base estimates on standard nutritional databases
         """
-        
-        # Generate content using Gemini
-        response = model.generate_content([prompt, image])
+          # Generate content using Gemini
+        try:
+            response = model.generate_content([prompt, image])
+            response_text = response.text.strip()
+        except Exception as gemini_error:
+            error_msg = str(gemini_error)
+            logger.error(f"Gemini API error: {error_msg}")
+            
+            # Check for specific API key errors
+            if "API_KEY_INVALID" in error_msg or "API key not valid" in error_msg:
+                return {
+                    "error": "❌ Invalid Gemini API key. Please update your API key in the .env file.\n\n🔑 Get a new key at: https://aistudio.google.com/app/apikey",
+                    "calories": 0,
+                    "food_name": "Unknown",
+                    "confidence": 0,
+                    "nutritional_info": {}
+                }
+            elif "PERMISSION_DENIED" in error_msg:
+                return {
+                    "error": "❌ API access denied. Please check your Gemini API permissions and billing settings.",
+                    "calories": 0,
+                    "food_name": "Unknown",
+                    "confidence": 0,
+                    "nutritional_info": {}
+                }
+            elif "QUOTA_EXCEEDED" in error_msg:
+                return {
+                    "error": "❌ API quota exceeded. Please check your usage limits or upgrade your plan.",
+                    "calories": 0,
+                    "food_name": "Unknown",
+                    "confidence": 0,
+                    "nutritional_info": {}
+                }
+            else:
+                return {
+                    "error": f"❌ Gemini API error: {error_msg}",
+                    "calories": 0,
+                    "food_name": "Unknown",
+                    "confidence": 0,
+                    "nutritional_info": {}
+                }
         
         # Parse the response
-        response_text = response.text.strip()
         
         # Try to extract JSON from the response
         import json
@@ -144,3 +181,33 @@ async def analyze_food_image(image_url: str) -> dict:
 def is_image_analysis_available() -> bool:
     """Check if image analysis is available"""
     return model is not None
+
+async def test_gemini_api() -> dict:
+    """Test if the Gemini API is working properly"""
+    if not model:
+        return {
+            "status": "error",
+            "message": "Gemini API key not configured"
+        }
+    
+    try:
+        # Test with a simple text prompt
+        response = model.generate_content("Say 'API test successful' if you can read this.")
+        return {
+            "status": "success",
+            "message": "Gemini API is working correctly",
+            "response": response.text.strip()
+        }
+    except Exception as e:
+        error_msg = str(e)
+        if "API_KEY_INVALID" in error_msg:
+            return {
+                "status": "error",
+                "message": "Invalid API key. Please update your GEMINI_API_KEY in the .env file.",
+                "help_url": "https://aistudio.google.com/app/apikey"
+            }
+        else:
+            return {
+                "status": "error",
+                "message": f"API error: {error_msg}"
+            }
