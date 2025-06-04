@@ -3,7 +3,7 @@ from discord.ext import commands
 import asyncio
 import logging
 from config import DISCORD_TOKEN, COMMAND_PREFIX, BOT_NAME, BOT_DESCRIPTION
-from image_analysis import analyze_food_image, is_image_analysis_available
+from image_analysis import analyze_food_image, is_image_analysis_available, test_gemini_api
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -101,14 +101,14 @@ async def calorie_help(ctx):
     commands_list = [
         (f"{COMMAND_PREFIX}addcalories <calories> [food_name]", "Add calories for a food item"),
         (f"{COMMAND_PREFIX}analyzeimage", "Analyze food image for calories (attach image)"),
+        (f"{COMMAND_PREFIX}testapi", "Test if Gemini AI is working properly"),
         (f"{COMMAND_PREFIX}ping", "Check bot responsiveness"),
         (f"{COMMAND_PREFIX}info", "Show bot information"),
     ]
     
     for command, description in commands_list:
         embed.add_field(name=command, value=description, inline=False)
-    
-    # Add image analysis status
+      # Add image analysis status
     if is_image_analysis_available():
         embed.add_field(
             name="🤖 AI Image Analysis", 
@@ -123,6 +123,65 @@ async def calorie_help(ctx):
         )
     
     await ctx.send(embed=embed)
+
+# API Test Command
+@bot.command(name='testapi', aliases=['test'])
+async def test_api(ctx):
+    """Test if the Gemini API is working properly"""
+    thinking_msg = await ctx.send("🧪 Testing Gemini API connection...")
+    
+    try:
+        result = await test_gemini_api()
+        await thinking_msg.delete()
+        
+        if result["status"] == "success":
+            embed = discord.Embed(
+                title="✅ API Test Successful",
+                description="Gemini AI is working correctly!",
+                color=0x00ff00
+            )
+            embed.add_field(
+                name="Response",
+                value=result.get("response", "API responded successfully"),
+                inline=False
+            )
+            embed.add_field(
+                name="Status",
+                value="🟢 Ready for image analysis",
+                inline=False
+            )
+        else:
+            embed = discord.Embed(
+                title="❌ API Test Failed",
+                description=result["message"],
+                color=0xff0000
+            )
+            if "help_url" in result:
+                embed.add_field(
+                    name="🔑 Get API Key",
+                    value=f"[Google AI Studio]({result['help_url']})",
+                    inline=False
+                )
+            embed.add_field(
+                name="💡 Next Steps",
+                value="1. Get a new API key from Google AI Studio\n2. Update your `.env` file\n3. Restart the bot\n4. Run `!testapi` again",
+                inline=False
+            )
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        try:
+            await thinking_msg.delete()
+        except:
+            pass
+        
+        embed = discord.Embed(
+            title="❌ Test Error",
+            description=f"An error occurred while testing: {str(e)}",
+            color=0xff0000
+        )
+        await ctx.send(embed=embed)
 
 # AI Image Analysis Command
 @bot.command(name='analyzeimage', aliases=['analyze', 'scan'])
